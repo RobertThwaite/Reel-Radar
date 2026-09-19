@@ -1,5 +1,15 @@
 import { describe, expect, it } from "vitest";
-import { buildGroups, pickCertification, rankSuggestions, toSuggestion, toYear, type RawMovie } from "../providers";
+import {
+  buildGroups,
+  pickCertification,
+  pickContentRating,
+  pickEpisodeRuntime,
+  rankSuggestions,
+  toSuggestion,
+  toSuggestions,
+  toYear,
+  type RawTitle,
+} from "../providers";
 
 const provider = (id: number, name: string, priority?: number) => ({
   provider_id: id,
@@ -22,18 +32,43 @@ describe("toYear", () => {
 
 describe("toSuggestion", () => {
   it("rounds the rating to one decimal place", () => {
-    const s = toSuggestion({ id: 1, title: "Heat", release_date: "1995-12-15", vote_average: 7.943 });
-    expect(s).toEqual({ id: 1, title: "Heat", year: "1995", posterPath: null, rating: 7.9 });
+    const s = toSuggestion({ id: 1, title: "Heat", release_date: "1995-12-15", vote_average: 7.943 }, "movie");
+    expect(s).toEqual({ id: 1, kind: "movie", title: "Heat", year: "1995", posterPath: null, rating: 7.9 });
+  });
+
+  it("reads a series' name and first-air date instead", () => {
+    const s = toSuggestion({ id: 9, name: "The Bear", first_air_date: "2022-06-23" }, "tv");
+    expect(s.title).toBe("The Bear");
+    expect(s.year).toBe("2022");
+    expect(s.kind).toBe("tv");
   });
 
   it("treats an absent or zero rating as null", () => {
-    expect(toSuggestion({ id: 2, title: "Unrated" }).rating).toBeNull();
-    expect(toSuggestion({ id: 3, title: "Zero", vote_average: 0 }).rating).toBeNull();
+    expect(toSuggestion({ id: 2, title: "Unrated" }, "movie").rating).toBeNull();
+    expect(toSuggestion({ id: 3, title: "Zero", vote_average: 0 }, "movie").rating).toBeNull();
+  });
+});
+
+describe("toSuggestions", () => {
+  it("keeps films and series, and drops people", () => {
+    const results = toSuggestions([
+      { id: 1, media_type: "movie", title: "Heat" },
+      { id: 2, media_type: "tv", name: "The Bear" },
+      { id: 3, media_type: "person", name: "Al Pacino" },
+    ]);
+    expect(results.map((r) => [r.kind, r.title])).toEqual([
+      ["movie", "Heat"],
+      ["tv", "The Bear"],
+    ]);
+  });
+
+  it("drops entries with no usable title and unknown media types", () => {
+    expect(toSuggestions([{ id: 4, media_type: "movie" }, { id: 5 }])).toEqual([]);
   });
 });
 
 describe("rankSuggestions", () => {
-  const movies: RawMovie[] = [
+  const movies: RawTitle[] = [
     { id: 1, title: "Heat and Dust", popularity: 90 },
     { id: 2, title: "Heat", popularity: 5 },
     { id: 3, title: "Dead Heat", popularity: 50 },
@@ -45,11 +80,19 @@ describe("rankSuggestions", () => {
   });
 
   it("breaks ties on popularity", () => {
-    const tied: RawMovie[] = [
+    const tied: RawTitle[] = [
       { id: 1, title: "The Thing", popularity: 10 },
       { id: 2, title: "The Thing", popularity: 99 },
     ];
     expect(rankSuggestions(tied, "the thing").map((m) => m.id)).toEqual([2, 1]);
+  });
+
+  it("ranks a series by its name alongside films", () => {
+    const mixed: RawTitle[] = [
+      { id: 1, media_type: "movie", title: "Fargo", popularity: 40 },
+      { id: 2, media_type: "tv", name: "Fargo", popularity: 80 },
+    ];
+    expect(rankSuggestions(mixed, "fargo").map((m) => m.id)).toEqual([2, 1]);
   });
 
   it("does not mutate the input array", () => {
@@ -111,5 +154,44 @@ describe("pickCertification", () => {
   it("returns null when the region is absent or unclassified", () => {
     expect(pickCertification(releaseDates, "FR")).toBeNull();
     expect(pickCertification(undefined, "GB")).toBeNull();
+  });
+});
+
+describe("pickContentRating", () => {
+  const ratings = {
+    results: [
+      { iso_3166_1: "US", rating: "TV-MA" },
+      { iso_3166_1: "GB", rating: "15" },
+      { iso_3166_1: "FR", rating: "  " },
+    ],
+  };
+
+  it("returns the rating for the requested region", () => {
+    expect(pickContentRating(ratings, "GB")).toBe("15");
+    expect(pickContentRating(ratings, "US")).toBe("TV-MA");
+  });
+
+  it("returns null when absent or blank", () => {
+    expect(pickContentRating(ratings, "FR")).toBeNull();
+    expect(pickContentRating(ratings, "DE")).toBeNull();
+    expect(pickContentRating(undefined, "GB")).toBeNull();
+  });
+});
+
+describe("pickEpisodeRuntime", () => {
+  it("averages a tight cluster of runtimes", () => {
+    expect(pickEpisodeRuntime([28, 30, 32])).toBe(30);
+    expect(pickEpisodeRuntime([50])).toBe(50);
+  });
+
+  it("gives up when episode lengths vary wildly", () => {
+    // Anthologies and series with feature-length finales have no "typical".
+    expect(pickEpisodeRuntime([22, 90])).toBeNull();
+  });
+
+  it("ignores missing and nonsense values", () => {
+    expect(pickEpisodeRuntime([])).toBeNull();
+    expect(pickEpisodeRuntime(undefined)).toBeNull();
+    expect(pickEpisodeRuntime([0, 0])).toBeNull();
   });
 });

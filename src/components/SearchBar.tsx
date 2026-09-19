@@ -141,12 +141,12 @@ export function SearchBar({ onSelect, onCredentialsMissing, compact = false }: P
           aria-controls={listId}
           aria-autocomplete="list"
           aria-activedescendant={activeIndex >= 0 ? `${listId}-opt-${activeIndex}` : undefined}
-          aria-label="Search for a film"
+          aria-label="Search for a film or series"
           autoComplete="off"
           autoCorrect="off"
           spellCheck={false}
           enterKeyHint="search"
-          placeholder={compact ? "Search another film…" : "Search a film…"}
+          placeholder={compact ? "Search another title…" : "Search a film or series…"}
           onChange={(e) => {
             setQuery(e.target.value);
             setActive(-1);
@@ -183,7 +183,7 @@ export function SearchBar({ onSelect, onCredentialsMissing, compact = false }: P
                 Nothing matching <span className="text-bone">&ldquo;{term}&rdquo;</span>. Try a different spelling?
               </p>
             ) : (
-              <ul id={listId} role="listbox" aria-label="Film suggestions">
+              <ul id={listId} role="listbox" aria-label="Search suggestions">
                 {results.map((movie, index) => (
                   <li key={movie.id} role="presentation">
                     <button
@@ -203,6 +203,15 @@ export function SearchBar({ onSelect, onCredentialsMissing, compact = false }: P
                           <Highlighted title={movie.title} query={term} />
                         </span>
                         <span className="mt-0.5 flex items-center gap-2 text-xs text-haze">
+                          <span
+                            className={`marquee rounded px-1.5 text-[10px] leading-[1.35] ${
+                              movie.kind === "tv"
+                                ? "bg-sky-400/15 text-sky-300"
+                                : "bg-gold/15 text-gold"
+                            }`}
+                          >
+                            {movie.kind === "tv" ? "Series" : "Film"}
+                          </span>
                           {movie.year && <span>{movie.year}</span>}
                           {movie.rating ? (
                             <span className="flex items-center gap-1">

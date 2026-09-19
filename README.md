@@ -2,7 +2,7 @@
 
 # 🎬 Reel Radar
 
-**Search any film. See exactly where it's streaming where you are.**
+**Search any film or series. See exactly where it's streaming where you are.**
 
 Subscription, free, rent or buy — across every major service, in 27 countries.
 
@@ -12,9 +12,9 @@ Subscription, free, rent or buy — across every major service, in 27 countries.
 
 ## What it does
 
-Type a film name and Reel Radar autocompletes as you go — poster, year and rating in the
-dropdown, so you pick the right *Blade Runner* first time. Choose one and it shows every way
-to watch it in your country, grouped by how you'd actually pay:
+Type a title and Reel Radar autocompletes as you go — poster, year, rating and whether it's a
+film or a series, so you pick the right *Blade Runner* first time. Choose one and it shows every
+way to watch it in your country, grouped by how you'd actually pay:
 
 | Group | Meaning |
 | --- | --- |
@@ -23,13 +23,32 @@ to watch it in your country, grouped by how you'd actually pay:
 | **Rent** | Pay once, watch within a window |
 | **Buy** | Own it outright |
 
-Results are region-aware and deep-linkable: `?film=335984&region=GB` restores the exact view,
-so you can share "it's on Netflix here" as a link.
+Results are region-aware and deep-linkable: `?film=335984&region=GB` for a film and
+`?tv=136315&region=GB` for a series restore the exact view, so you can share "it's on Netflix
+here" as a link.
+
+### Films and series
+
+One search box covers both. TMDB models them as separate types with different field names, so
+the app normalises them into one shape at the edge and the detail panel adapts:
+
+| | Film | Series |
+| --- | --- | --- |
+| Length | Runtime, e.g. `2h 44m` | `4 seasons · 38 episodes · ~31m each` |
+| Dates | Release year | Run, e.g. `2022–present` or `1994–2004` |
+| Credits | Director | Creator |
+| Age rating | BBFC/MPAA classification | TV content rating |
+
+A series also shows whether it's still running. Episode length is only shown when TMDB reports a
+consistent one — anthologies and series with feature-length finales get no "typical" episode, so
+nothing is claimed.
 
 ### Details worth knowing
 
-- **Autocomplete that ranks sensibly.** TMDB's raw relevance buries famous films under obscure
-  same-name ones, so exact title matches sort first, then prefix matches, then popularity.
+- **Autocomplete that ranks sensibly.** TMDB's raw relevance buries famous titles under obscure
+  same-name ones, so exact title matches sort first, then prefix matches, then popularity. The
+  search hits `/search/multi`, so films and series share one relevance ordering; people are
+  filtered out, having nothing to stream.
 - **Keyboard-complete.** `↑`/`↓` to move, `Enter` to pick, `Esc` to dismiss — a proper ARIA
   combobox, not a div with a click handler.
 - **Mobile-first.** Built at 390px up. The country picker is a native `<select>`, so phones get
@@ -129,14 +148,14 @@ deploy.
 ```
 src/
 ├── app/
-│   ├── api/search/route.ts       # autocomplete feed
-│   ├── api/movie/[id]/route.ts   # details + watch providers, one round trip
+│   ├── api/search/route.ts            # autocomplete feed, films + series
+│   ├── api/title/[kind]/[id]/route.ts # details + watch providers, one round trip
 │   ├── page.tsx                  # server shell
 │   └── globals.css               # cinema theme: grain, vignette, marquee type
 ├── components/
 │   ├── Finder.tsx                # orchestrates URL state, region and fetching
 │   ├── SearchBar.tsx             # the ARIA combobox
-│   ├── MoviePanel.tsx            # the result card
+│   ├── TitlePanel.tsx            # the result card, film or series
 │   ├── ProviderShelf.tsx         # one row of services
 │   └── Backdrop.tsx              # crossfading blurred still
 └── lib/
@@ -163,7 +182,7 @@ autocomplete immune to a slow early request landing after a newer one.
 npm run dev        # dev server
 npm run lint       # eslint
 npm run typecheck  # tsc --noEmit
-npm test           # vitest — 25 unit tests over the normalisation layer
+npm test           # vitest — 34 unit tests over the normalisation layer
 npm run build      # production build
 ```
 
@@ -172,7 +191,6 @@ npm run build      # production build
 - **Next on TV.** Broadcast listings ("it's on BBC Two at 9pm Thursday") were scoped out of v1:
   there's no free global EPG API. The intended route is an XMLTV adapter, since that's the format
   UK guide data is published in.
-- TV series as well as films — TMDB exposes the same provider data for them.
 - Price comparison across rental services.
 - Notify me when this lands on a service I already pay for.
 

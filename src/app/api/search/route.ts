@@ -1,11 +1,11 @@
 import { NextResponse } from "next/server";
 import { tmdb, TmdbError, hasCredentials } from "@/lib/tmdb";
-import { rankSuggestions, toSuggestion, type RawMovie } from "@/lib/providers";
+import { rankSuggestions, toSuggestions, type RawTitle } from "@/lib/providers";
 import type { ApiError, Suggestion } from "@/lib/types";
 
 export const runtime = "nodejs";
 
-/** GET /api/search?q=blade+runner — autocomplete feed. */
+/** GET /api/search?q=the+bear — autocomplete over films and series together. */
 export async function GET(request: Request) {
   const query = (new URL(request.url).searchParams.get("q") ?? "").trim();
 
@@ -20,12 +20,15 @@ export async function GET(request: Request) {
   }
 
   try {
-    const data = await tmdb<{ results?: RawMovie[] }>(
-      "/search/movie",
+    // One multi-search rather than a film and a series call: it keeps the two
+    // kinds in a single relevance ordering, which is what the user expects
+    // from one box. People are filtered out during normalisation.
+    const data = await tmdb<{ results?: RawTitle[] }>(
+      "/search/multi",
       { query, include_adult: "false", language: "en-US", page: "1" },
       60 * 5,
     );
-    const results = rankSuggestions(data.results ?? [], query).slice(0, 8).map(toSuggestion);
+    const results = toSuggestions(rankSuggestions(data.results ?? [], query)).slice(0, 8);
     return NextResponse.json({ results });
   } catch (error) {
     return errorResponse(error);

@@ -3,21 +3,38 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Backdrop } from "@/components/Backdrop";
-import { MoviePanel } from "@/components/MoviePanel";
+import { TitlePanel } from "@/components/TitlePanel";
 import { RegionPicker } from "@/components/RegionPicker";
 import { SearchBar } from "@/components/SearchBar";
 import { SetupNotice } from "@/components/SetupNotice";
 import { ReelIcon } from "@/components/Icons";
 import { normaliseRegion } from "@/lib/regions";
 import { rememberFilm, rememberRegion, usePrefs } from "@/lib/store";
-import type { MovieDetail, Suggestion } from "@/lib/types";
+import type { Suggestion, TitleDetail, TitleKind } from "@/lib/types";
 
-/** Shown to first-time visitors so the empty state is a starting point, not a void. */
-const STARTERS = ["Blade Runner 2049", "Paddington 2", "Parasite", "Heat", "Arrival"];
+/** Shown to first-time visitors so the empty state is a starting point, not a void.
+ *  A deliberate mix of films and series, so the box advertises that it covers both. */
+const STARTERS = ["Blade Runner 2049", "The Bear", "Paddington 2", "Severance", "Parasite"];
 
 /** A fetched detail, tagged with what it was fetched for — so "is this current?"
  *  is a comparison rather than another piece of state to keep in sync. */
-type Loaded = { id: number; region: string; data: MovieDetail | null; error: string | null };
+type Loaded = {
+  id: number;
+  kind: TitleKind;
+  region: string;
+  data: TitleDetail | null;
+  error: string | null;
+};
+
+/** Films stay on ?film= so links shared before series support still resolve;
+ *  series get their own ?tv=. */
+function readSelection(params: URLSearchParams): { id: number; kind: TitleKind } | null {
+  for (const [param, kind] of [["film", "movie"], ["tv", "tv"]] as const) {
+    const id = Number(params.get(param));
+    if (Number.isInteger(id) && id > 0) return { id, kind };
+  }
+  return null;
+}
 
 export function Finder() {
   const router = useRouter();
@@ -26,51 +43,64 @@ export function Finder() {
 
   // The URL is the source of truth; stored preferences only fill the gaps.
   const region = normaliseRegion(params.get("region") ?? prefs.region);
-  const filmParam = Number(params.get("film"));
-  const filmId = Number.isInteger(filmParam) && filmParam > 0 ? filmParam : null;
+  const selection = readSelection(params);
+  // Identity of `selection` changes every render, so effects and callbacks
+  // hang off these primitives instead.
+  const selectedId = selection?.id ?? null;
+  const selectedKind = selection?.kind ?? null;
 
   const [loaded, setLoaded] = useState<Loaded | null>(null);
   const [needsSetup, setNeedsSetup] = useState(false);
   const panelRef = useRef<HTMLDivElement>(null);
 
-  const current = loaded && loaded.id === filmId && loaded.region === region;
-  const movie = current ? loaded.data : null;
+  const current =
+    loaded !== null &&
+    loaded.id === selectedId &&
+    loaded.kind === selectedKind &&
+    loaded.region === region;
+  const title = current ? loaded.data : null;
   const error = current ? loaded.error : null;
-  const loading = filmId !== null && !current;
+  const loading = selectedId !== null && !current;
 
   useEffect(() => {
-    if (filmId === null || current) return;
+    if (selectedId === null || selectedKind === null || current) return;
 
+    const id = selectedId;
+    const kind = selectedKind;
     let cancelled = false;
-    fetch(`/api/movie/${filmId}?region=${region}`)
+    fetch(`/api/title/${kind}/${id}?region=${region}`)
       .then(async (res) => {
         const body = await res.json();
         if (cancelled) return;
         if (res.ok) {
           setNeedsSetup(false);
-          setLoaded({ id: filmId, region, data: body as MovieDetail, error: null });
+          setLoaded({ id, kind, region, data: body as TitleDetail, error: null });
         } else {
           if (body?.code === "no_credentials") setNeedsSetup(true);
-          setLoaded({ id: filmId, region, data: null, error: body?.error ?? "Could not load that film." });
+          setLoaded({ id, kind, region, data: null, error: body?.error ?? "Could not load that title." });
         }
       })
       .catch(() => {
         if (!cancelled) {
-          setLoaded({ id: filmId, region, data: null, error: "Could not load that film." });
+          setLoaded({ id, kind, region, data: null, error: "Could not load that title." });
         }
       });
 
     return () => {
       cancelled = true;
     };
-  }, [filmId, region, current]);
+  }, [selectedId, selectedKind, region, current]);
 
   const navigate = useCallback(
-    (nextFilm: number | null, nextRegion: string, mode: "push" | "replace") => {
-      const next = new URLSearchParams();
-      if (nextFilm) next.set("film", String(nextFilm));
-      next.set("region", nextRegion);
-      router[mode](`?${next}`, { scroll: false });
+    (
+      next: { id: number; kind: TitleKind } | null,
+      nextRegion: string,
+      mode: "push" | "replace",
+    ) => {
+      const query = new URLSearchParams();
+      if (next) query.set(next.kind === "tv" ? "tv" : "film", String(next.id));
+      query.set("region", nextRegion);
+      router[mode](`?${query}`, { scroll: false });
     },
     [router],
   );
@@ -78,7 +108,7 @@ export function Finder() {
   const select = useCallback(
     (suggestion: Suggestion) => {
       rememberFilm(suggestion);
-      navigate(suggestion.id, region, "push");
+      navigate({ id: suggestion.id, kind: suggestion.kind }, region, "push");
       // Let the panel mount before scrolling to it.
       requestAnimationFrame(() => {
         panelRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
@@ -91,9 +121,9 @@ export function Finder() {
     (code: string) => {
       const next = normaliseRegion(code);
       rememberRegion(next);
-      navigate(filmId, next, "replace");
+      navigate(selectedId && selectedKind ? { id: selectedId, kind: selectedKind } : null, next, "replace");
     },
-    [filmId, navigate],
+    [selectedId, selectedKind, navigate],
   );
 
   const onCredentialsMissing = useCallback(() => setNeedsSetup(true), []);
@@ -117,11 +147,11 @@ export function Finder() {
     [select],
   );
 
-  const hasResult = filmId !== null || needsSetup;
+  const hasResult = selectedId !== null || needsSetup;
 
   return (
     <>
-      <Backdrop path={movie?.backdropPath ?? null} />
+      <Backdrop path={title?.backdropPath ?? null} />
 
       <div className="relative z-10 mx-auto flex min-h-screen-safe w-full max-w-5xl flex-col px-4 pb-16 sm:px-6">
         <header className="flex items-center justify-between gap-4 py-5 sm:py-7">
@@ -146,7 +176,7 @@ export function Finder() {
                 <br className="sm:hidden" /> watch it?
               </h1>
               <p className="mx-auto mt-4 max-w-md text-pretty text-sm text-haze sm:text-base">
-                Type a film and see which services have it where you are — subscription, free, rent or buy.
+                Type a film or series and see which services have it where you are — subscription, free, rent or buy.
               </p>
             </div>
           )}
@@ -186,8 +216,8 @@ export function Finder() {
               <PanelSkeleton />
             ) : error ? (
               <p className="plate rounded-card px-5 py-8 text-center text-sm text-haze">{error}</p>
-            ) : movie ? (
-              <MoviePanel movie={movie} />
+            ) : title ? (
+              <TitlePanel title={title} />
             ) : null}
           </div>
         </main>
