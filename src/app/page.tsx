@@ -14,7 +14,7 @@ export default function Home() {
  *  quiet so it reads as the page settling rather than a loading screen. */
 function Curtain() {
   return (
-    <div className="relative z-10 flex min-h-dvh items-center justify-center">
+    <div className="relative z-10 flex min-h-screen-safe items-center justify-center">
       <ReelIcon className="size-8 animate-spin text-gold/50 [animation-duration:2.5s]" />
     </div>
   );

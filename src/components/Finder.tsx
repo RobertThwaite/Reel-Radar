@@ -123,7 +123,7 @@ export function Finder() {
     <>
       <Backdrop path={movie?.backdropPath ?? null} />
 
-      <div className="relative z-10 mx-auto flex min-h-dvh w-full max-w-5xl flex-col px-4 pb-16 sm:px-6">
+      <div className="relative z-10 mx-auto flex min-h-screen-safe w-full max-w-5xl flex-col px-4 pb-16 sm:px-6">
         <header className="flex items-center justify-between gap-4 py-5 sm:py-7">
           <button
             type="button"

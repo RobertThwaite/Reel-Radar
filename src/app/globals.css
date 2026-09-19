@@ -18,6 +18,11 @@
 }
 
 @layer base {
+  :root {
+    --safe-top: env(safe-area-inset-top, 0px);
+    --safe-bottom: env(safe-area-inset-bottom, 0px);
+  }
+
   * {
     -webkit-tap-highlight-color: transparent;
   }
@@ -34,6 +39,11 @@
     /* iOS: keep the backdrop from bouncing past the film grain. */
     overscroll-behavior-y: none;
     min-height: 100dvh;
+    /* Installed on iOS the page runs edge to edge, under the notch and the home
+       indicator. In a browser every inset is 0, so this changes nothing there. */
+    padding:
+      var(--safe-top) env(safe-area-inset-right, 0px)
+      var(--safe-bottom) env(safe-area-inset-left, 0px);
   }
 
   ::selection {
@@ -74,6 +84,11 @@
       transparent
     );
   }
+}
+
+/* Stands in for min-h-dvh inside the safe-area padding. */
+@utility min-h-screen-safe {
+  min-height: calc(100dvh - var(--safe-top) - var(--safe-bottom));
 }
 
 @utility scrollbar-none {

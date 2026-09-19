@@ -69,6 +69,30 @@ exactly what to add.
 The credential is only ever read server-side, inside the API routes. It is never sent to the
 browser.
 
+## Install it on your phone
+
+Reel Radar is a PWA, so it can live on a home screen and open full screen with no browser
+chrome. The two platforms behave differently:
+
+| | Android / Chrome | iPhone / iPad (Safari) |
+| --- | --- | --- |
+| Add to home screen | Chrome offers it automatically | Share ▸ **Add to Home Screen** |
+| Install prompt API | `beforeinstallprompt` | Not supported, and won't be |
+| Runs full screen | Yes | Yes |
+| Icon format | PNG or SVG | **PNG only** — iOS ignores SVG icons |
+
+Because Safari never prompts, the app shows a dismissible hint on iOS pointing at the share
+sheet — otherwise most people never discover the gesture. Dismissing it is remembered.
+
+Two iOS details that are easy to get wrong and are handled here: Next emits only the unprefixed
+`mobile-web-app-capable`, so the Apple-prefixed tag is set explicitly (without it, older iOS
+opens the icon in a browser tab rather than standalone); and with `viewport-fit=cover` the
+installed app runs under the notch, so `env(safe-area-inset-*)` keeps content clear of it.
+
+A small service worker makes the installed app launch instantly and degrade gracefully with no
+signal. It deliberately **never caches `/api` responses** — streaming availability changes, and a
+confidently wrong answer is worse than no answer.
+
 ## Running it on GitHub
 
 **Codespaces — the quickest way to see it running.** Click *Code ▸ Codespaces ▸ Create
