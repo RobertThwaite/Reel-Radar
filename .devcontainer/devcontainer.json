@@ -1,0 +1,22 @@
+{
+  "name": "Reel Radar",
+  "image": "mcr.microsoft.com/devcontainers/typescript-node:22",
+  "postCreateCommand": "npm install",
+  "forwardPorts": [3000],
+  "portsAttributes": {
+    "3000": {
+      "label": "Reel Radar",
+      "onAutoForward": "openPreview"
+    }
+  },
+  "secrets": {
+    "TMDB_ACCESS_TOKEN": {
+      "description": "TMDB v4 API Read Access Token. Free from https://www.themoviedb.org/settings/api"
+    }
+  },
+  "customizations": {
+    "vscode": {
+      "extensions": ["dbaeumer.vscode-eslint", "bradlc.vscode-tailwindcss"]
+    }
+  }
+}
