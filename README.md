@@ -82,7 +82,12 @@ chrome. The two platforms behave differently:
 | Icon format | PNG or SVG | **PNG only** — iOS ignores SVG icons |
 
 Because Safari never prompts, the app shows a dismissible hint on iOS pointing at the share
-sheet — otherwise most people never discover the gesture. Dismissing it is remembered.
+sheet — otherwise most people never discover the gesture. On Android the same slot becomes a real
+Install button, wired to the deferred `beforeinstallprompt`. Dismissing it is remembered.
+
+On the Android side the manifest carries maskable icons, so Chrome's circular crop doesn't clip
+the logo, plus screenshots — with them Chrome shows a store-like install card instead of a bare
+dialog — and a fixed `id`, so changing `start_url` later can't orphan existing installs.
 
 Two iOS details that are easy to get wrong and are handled here: Next emits only the unprefixed
 `mobile-web-app-capable`, so the Apple-prefixed tag is set explicitly (without it, older iOS
